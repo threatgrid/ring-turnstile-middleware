@@ -4,42 +4,63 @@
 
 Ring middleware for the Turnstile rate limiting service
 
-** Usage
+** Basic Usage
 
-Use =wrap-rate-limit-fn= to create an instance of the middleware, wrap your routes with it:
+Use =wrap-rate-limit= to create an instance of the middleware, wrap your handler with it:
 
 #+BEGIN_SRC clojure
 
-(require '[ring.middleware.turnstile :refer [wrap-rate-limit-fn]]
+(require '[ring.middleware.turnstile :refer [wrap-rate-limit]]
          '[ring.util.response :refer [response]])
 
-(def handler [request]
-  (response {:foo "bar"}))
+(def app (-> your-routes
+             (wrap-rate-limit {:redis-conf {}
+                               :limits [(ip-limit 200)]))
 
-(def app
-  (let [wrap-rate-limit
-        (wrap-rate-limit-fn {:exceptions [{:ip "127.0.0.1"}]
-                             :limits [{:key [:ip :method]
-                                       :default 240
-                                       :override {["10.2.34.5" "GET"] 1000}}]}
-                            (fn [request]
-                              {:ip (:remote-addr request)
-                               :method (:request-method request)}))]
-    (wrap-rate-limit handler)))
-
-(def handler [request]
-  (response {:foo "bar"}))
+;; 200 requests per hour per IP address
 
 #+END_SRC
 
-| Option             | Description                                                                                                                                |
-|--------------------+--------------------------------------------------------------------------------------------------------------------------------------------|
-| exceptions         | collection of filter maps for which no rate limit should be applied                                                                        |
-| limits             | a collection of rate limits                                                                                                                |
-| limits.[].key      | a collection of fields that composes the rate limit ID. They are provided by the fn passes as the second parameter of =wrap-rate-limit-fn= |
-| limits.[].default  | default amount of requests per hour                                                                                                        |
-| limits.[].override | A map to override default limits for a specific key                                                                                        |
+** Advanced usage
 
+*** Custom rate limit handler
+
+If you want to do some specific operations when a call is rate limited, you can define your own rate limit handler:
+
+#+BEGIN_SRC clojure
+
+(require '[ring.middleware.turnstile :refer [wrap-rate-limit]]
+         '[ring.util.response :refer [response]])
+
+(def app (-> your-routes
+             (wrap-rate-limit {:redis-conf {}
+                               :limits [(ip-limit 200)]
+                               :rate-limit-handler 
+                               (fn [request next-slot-in-ms]
+                                {:status 429
+                                 :body (format "Too many requests, try later in %d ms"
+                                               next-slot-in-ms)})}))
+#+END_SRC
+
+*** Compose rate limits
+
+You can compose your limits with the `combine-limits` function:
+
+#+BEGIN_SRC clojure
+
+(require '[ring.middleware.turnstile :refer [wrap-rate-limit combine-limits]]
+         '[ring.util.response :refer [response]])
+
+(def app (-> your-routes
+             (wrap-rate-limit {:redis-conf {}
+                               :limits [(ip-limit 200)
+                                        (header-limit 4 "x-id")]))
+
+;; 200 requests per hour per IP address and `x-id` header
+
+#+END_SRC
+
+The limit key is composed by the key of all rate limiters.
 
 ** License
 
