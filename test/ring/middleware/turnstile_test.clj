@@ -20,8 +20,6 @@
 
 (use-fixtures :each reset-limits-fixture)
 
-
-
 (deftest combine-limits-test
   (let [ip-limit (sut/ip-limit 4)
         header-limit (sut/header-limit 4 "x-id")
