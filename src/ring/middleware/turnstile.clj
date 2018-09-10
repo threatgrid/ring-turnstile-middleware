@@ -25,6 +25,7 @@
 
 (s/defschema Conf
   {:redis-conf RedisConf
+   :key-prefix s/Str
    :limits [Limit]
    (s/optional-key :rate-limit-handler) (s/=> HttpResponse HttpRequest s/Int)})
 
@@ -109,8 +110,9 @@
 (defn wrap-rate-limit
   "Middleware for the turnstile rate limiting service"
   [handler
-   {:keys [redis-conf limits rate-limit-handler]
-    :or {rate-limit-handler default-rate-limit-handler} :as conf}]
+   {:keys [redis-conf limits rate-limit-handler key-prefix]
+    :or {rate-limit-handler default-rate-limit-handler
+         key-prefix ""} :as conf}]
   ;; Check the configuration
   (s/validate Conf conf)
   (fn [request]
@@ -118,7 +120,7 @@
       (let [turnstile
             (map->RedisTurnstile {:conn-spec redis-conf
                                   :pool {}
-                                  :name (key-fn request)
+                                  :name (str key-prefix "-" (key-fn request))
                                   :expiration-ms (* 1000 60 60)})]
         (cond
           (or (unlimited? limit)

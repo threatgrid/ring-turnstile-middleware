@@ -143,3 +143,21 @@
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
           (is (= 7 (get-in response [:headers "X-RateLimit-Remaining"])))
           (is (= 10 (get-in response [:headers "X-RateLimit-Limit"]))))))))
+
+(deftest wrap-rate-limit-key-prefix-test
+  (let [app1 (-> (fn [req] {:status 200
+                           :headers {"Content-Type" "application/json"}
+                           :body "{}"})
+                (sut/wrap-rate-limit {:redis-conf {}
+                                      :key-prefix "api-1"
+                                      :limits [(sut/ip-limit 5)]}))
+        app2 (-> (fn [req] {:status 200
+                            :headers {"Content-Type" "application/json"}
+                            :body "{}"})
+                 (sut/wrap-rate-limit {:redis-conf {}
+                                       :key-prefix "api-2"
+                                       :limits [(sut/ip-limit 5)]}))]
+    (let [response (-> (request :get "/") app1)]
+      (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"]))))
+    (let [response (-> (request :get "/") app2)]
+      (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"]))))))
