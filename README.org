@@ -56,8 +56,8 @@ You can compose your limits with the `combine-limits` function:
 (def app (-> your-routes
              (wrap-rate-limit {:redis-conf {}
                                :key-prefix "your-api"
-                               :limits [(ip-limit 200)
-                                        (header-limit 4 "x-id")]))
+                               :limits [(combine-limits (ip-limit 200)
+                                                        (header-limit 4 "x-id"))]))
 
 ;; 200 requests per hour per IP address and `x-id` header
 
