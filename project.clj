@@ -11,6 +11,7 @@
                  [msprunck/turnstile "0.101-SNAPSHOT"]
                  [metosin/schema-tools "0.10.4"]
                  [prismatic/schema "1.1.9"]
-                 [ring/ring-mock "0.3.2"]]
+                 [ring/ring-mock "0.3.2"]
+                 [ch.qos.logback/logback-classic "1.2.3"]]
   :profile {:dev {:dependencies [[com.taoensso/carmine "2.18.1"]]}})
 

@@ -1,7 +1,7 @@
 (ns ring.middleware.turnstile-test
-  (:require [ring.middleware.turnstile :as sut]
-            [clojure.test :as t :refer [deftest testing is are use-fixtures]]
-            [ring.mock.request :refer [request header]]
+  (:require [clojure.test :as t :refer [deftest is testing use-fixtures]]
+            [ring.middleware.turnstile :as sut]
+            [ring.mock.request :refer [header request]]
             [schema.test :refer [validate-schemas]]
             [taoensso.carmine :as car]))
 
@@ -20,47 +20,6 @@
 
 (use-fixtures :each reset-limits-fixture)
 
-(deftest combine-limits-test
-  (let [ip-limit (sut/ip-limit 4)
-        header-limit (sut/header-limit 4 "x-id")
-        {:keys [key-fn rate-limited-fn limit]}
-        (sut/combine-limits [ip-limit header-limit] 5)]
-    (is (= 5 limit)
-        "The combined limit overrides all specific limits")
-    (is (= "10.2.3.4-12345"
-           (key-fn {:remote-addr "10.2.3.4"
-                    :headers {"x-id" "12345"}}))
-        "The rate limit key is composed by the key of the combined limits")
-    (is (rate-limited-fn {:remote-addr "10.2.3.4"
-                          :headers {"x-id" "12345"}})
-        "Rate limit if the `:rate-limited-fn` of both limits return true")
-    (is (not (rate-limited-fn {:remote-addr "10.2.3.4"
-                               :headers {}}))
-        "No rate limit if one of the  `:rate-limited-fn` returns false")))
-
-(deftest limit-to-apply-test
-  (let [ip-limit (sut/ip-limit 4)
-        header-limit (sut/header-limit 4 "x-id")
-        exception-limit {:key-fn (constantly "")
-                         :rate-limited-fn
-                         (fn [request]
-                           (= "1234"
-                              (get-in request [:headers "x-id"])))
-                         :limit sut/no-limit}
-        limits [exception-limit
-                header-limit
-                ip-limit]]
-    (is (= ip-limit
-           (sut/limit-to-apply {:remote-addr "10.2.3.4"} limits)))
-    (is (= exception-limit
-           (sut/limit-to-apply {:remote-addr "10.2.3.4"
-                                :headers {"x-id" "1234"}}
-                               limits)))
-    (is (= header-limit
-           (sut/limit-to-apply {:remote-addr "10.2.3.4"
-                                :headers {"x-id" "2222"}}
-                               limits)))))
-
 (deftest default-rate-limit-handler-test
   (is (= {:status 429
           :headers {"Content-Type" "application/json"
@@ -68,17 +27,23 @@
           :body "{\"error\": \"Too Many Requests\"}"}
          (sut/default-rate-limit-handler {} 2500))))
 
+(defn wrap-with-exception
+  [f]
+  (fn [request]
+    (when-not (= "1234" (get-in request [:headers "x-id"]))
+      (f request))))
+
 (deftest wrap-rate-limit-test
   (testing "One limit"
     (let [app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
                   (sut/wrap-rate-limit {:redis-conf {}
-                                        :limits [(sut/ip-limit 5)]}))]
+                                        :limit-fns [(sut/ip-limit 5)]}))]
       (testing "Rate limit headers"
         (let [response (-> (request :get "/") app)]
-          (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 5 (get-in response [:headers "X-RateLimit-Limit"])))))
+          (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= 5 (get-in response [:headers "X-RateLimit-IP-Limit"])))))
       (testing "Rate limit status and response"
         (dotimes [_ 5] (-> (request :get "/") app))
         (let [response (-> (request :get "/") app)]
@@ -91,7 +56,7 @@
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
                   (sut/wrap-rate-limit {:redis-conf {}
-                                        :limits [(sut/ip-limit 5)]
+                                        :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
                                         (fn [request next-slot-in-ms]
                                           {:status 429
@@ -103,44 +68,40 @@
                (:body response))))))
   (testing "Mulitple limiters"
     (reset-limits!)
-    (let [ip-limit (sut/ip-limit 5)
-          header-limit (sut/header-limit 10 "x-id")
-          exception-limit {:key-fn (constantly "")
-                           :rate-limited-fn
-                           (fn [request]
-                             (= "1234"
-                                (get-in request [:headers "x-id"])))
-                           :limit sut/no-limit}
+    (let [ip-limit (wrap-with-exception (sut/ip-limit 8))
+          header-limit (wrap-with-exception (sut/header-limit 10 "x-id" "ID"))
           app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
                   (sut/wrap-rate-limit {:redis-conf {}
-                                        :limits [exception-limit
-                                                 header-limit
+                                        :limit-fns [header-limit
                                                  ip-limit]}))]
-      (testing "Header limit when the `x-id` header is set"
+      (testing "Limits when the `x-id` header is set"
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 9 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-Limit"]))))
+          (is (= 9 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "2")app)]
-          (is (= 9 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-Limit"])))))
-      (testing "IP limit when the `x-id` header is not set"
+          (is (= 9 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"])))
+          (is (= 6 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= 8 (get-in response [:headers "X-RateLimit-IP-Limit"])))))
+      (testing "Limits when the `x-id` header is not set"
         (let [response (-> (request :get "/") app)]
-          (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 5 (get-in response [:headers "X-RateLimit-Limit"]))))
+          (is (= 5 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= 8 (get-in response [:headers "X-RateLimit-IP-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 8 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-Limit"]))))
+          (is (= 8 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "2") app)]
-          (is (= 8 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-Limit"])))))
+          (is (= 8 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"])))))
       (testing "Unlimited limit for the exception limit"
         (let [response (-> (request :get "/") (header "x-id" "1234") app)]
-          (is (not (contains? (:headers response) "X-RateLimit-Remaining"))))
+          (is (not (contains? (:headers response) "X-RateLimit-ID-Remaining")))
+          (is (not (contains? (:headers response) "X-RateLimit-IP-Remaining"))))
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 7 (get-in response [:headers "X-RateLimit-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-Limit"]))))))))
+          (is (= 7 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))))))
 
 (deftest wrap-rate-limit-key-prefix-test
   (let [app1 (-> (fn [req] {:status 200
@@ -148,14 +109,14 @@
                            :body "{}"})
                 (sut/wrap-rate-limit {:redis-conf {}
                                       :key-prefix "api-1"
-                                      :limits [(sut/ip-limit 5)]}))
+                                      :limit-fns [(sut/ip-limit 5)]}))
         app2 (-> (fn [req] {:status 200
                             :headers {"Content-Type" "application/json"}
                             :body "{}"})
                  (sut/wrap-rate-limit {:redis-conf {}
                                        :key-prefix "api-2"
-                                       :limits [(sut/ip-limit 5)]}))]
+                                       :limit-fns [(sut/ip-limit 5)]}))]
     (let [response (-> (request :get "/") app1)]
-      (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"]))))
+      (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"]))))
     (let [response (-> (request :get "/") app2)]
-      (is (= 4 (get-in response [:headers "X-RateLimit-Remaining"]))))))
+      (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"]))))))

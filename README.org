@@ -10,15 +10,18 @@ Use =wrap-rate-limit= to create an instance of the middleware, wrap your handler
 
 #+BEGIN_SRC clojure
 
-(require '[ring.middleware.turnstile :refer [wrap-rate-limit]]
+(require '[ring.middleware.turnstile 
+           :refer [wrap-rate-limit ip-limit header-limit]]
          '[ring.util.response :refer [response]])
 
 (def app (-> your-routes
              (wrap-rate-limit {:redis-conf {}
                                :key-prefix "your-api"
-                               :limits [(ip-limit 200)]))
+                               :limit-fns [(ip-limit 200)
+                                           (header-limit 300 "x-role" "ROLE")]))
 
 ;; 200 requests per hour per IP address
+;; 300 requests per hour per value of the header `x-role`
 
 #+END_SRC
 
@@ -30,40 +33,56 @@ If you want to do some specific operations when a call is rate limited, you can 
 
 #+BEGIN_SRC clojure
 
-(require '[ring.middleware.turnstile :refer [wrap-rate-limit]]
+(require '[ring.middleware.turnstile :refer [wrap-rate-limit ip-limit]]
          '[ring.util.response :refer [response]])
 
 (def app (-> your-routes
              (wrap-rate-limit {:redis-conf {}
                                :key-prefix "your-api"
-                               :limits [(ip-limit 200)]
+                               :limit-fns [(ip-limit 200)]
                                :rate-limit-handler 
-                               (fn [request next-slot-in-ms]
-                                {:status 429
-                                 :body (format "Too many requests, try later in %d ms"
-                                               next-slot-in-ms)})}))
+                                (fn [request next-slot-in-ms]
+                                 {:status 429
+                                  :body (format "Too many requests, try later in %d ms"
+                                                next-slot-in-ms)})}))
 #+END_SRC
 
-*** Compose rate limits
+*** Custom limit
 
-You can compose your limits with the `combine-limits` function:
+You can create your own limit
 
 #+BEGIN_SRC clojure
 
-(require '[ring.middleware.turnstile :refer [wrap-rate-limit combine-limits]]
-         '[ring.util.response :refer [response]])
+(require '[ring.middleware.turnstile :refer [wrap-rate-limit ip-limit]]
+         '[ring.util.response :refer [response]])   
+
+(def custom-limit
+  [request]
+  (when-let [role (get-in request [:jwt "role"])
+             ip-limit-fn (ip-limit 100)]
+    (cond-> (ip-limit-fn request)
+      (= "admin" role) (assoc :nb-request-per-hour 200))))
 
 (def app (-> your-routes
              (wrap-rate-limit {:redis-conf {}
                                :key-prefix "your-api"
-                               :limits [(combine-limits (ip-limit 200)
-                                                        (header-limit 4 "x-id"))]))
+                               :limits [custom-limit]))
 
-;; 200 requests per hour per IP address and `x-id` header
+;; 200 requests per hour per IP for amdin users
+;; 100 requests per hour for the others
 
 #+END_SRC
 
-The limit key is composed by the key of all rate limiters.
+The limit fn must return a hash map with the following keys:
+
+| Keyword                | Description                                                                                                          |
+| =:nb-request-per-hour= | The number of request per hour limit                                                                                 |
+| =:rate-limit-key=      | The rate limit key to group requests                                                                                 |
+| =:header-infix=        | Used in the rate limit headers to identify a rate limit. (templates: =X-RateLimit-%s-Limit=, =X-RateLimit-%s-Limit=) |
+
+or 
+
+=nil= if the request is not rate limited.
 
 ** License
 
