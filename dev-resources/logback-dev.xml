@@ -1,0 +1,26 @@
+<configuration scan="true">
+  <appender name="COLOR" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>[%d{HH:mm:ss.SSS}] %highlight([%level]) %cyan([%logger{80} %file:%line])\n%highlight(%msg%n)</pattern>
+    </encoder>
+  </appender>
+  <appender name="NOCOLOR" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>[%d{HH:mm:ss.SSS}] [%level] [%logger{80} %file:%line]\n%msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="info">
+    <!-- to use enable this mode pass -Dcolor to jvm
+         Should be set only for dev profile in project.clj
+    -->
+    <if condition='isDefined("color")'>
+      <then>
+        <appender-ref ref="COLOR"/>
+      </then>
+      <else>
+        <appender-ref ref="NOCOLOR"/>
+      </else>
+    </if>
+  </root>
+</configuration>
