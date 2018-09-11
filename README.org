@@ -78,7 +78,7 @@ The limit fn must return a hash map with the following keys:
 | Keyword                | Description                                                                                                          |
 | =:nb-request-per-hour= | The number of request per hour limit                                                                                 |
 | =:rate-limit-key=      | The rate limit key to group requests                                                                                 |
-| =:header-infix=        | Used in the rate limit headers to identify a rate limit. (templates: =X-RateLimit-%s-Limit=, =X-RateLimit-%s-Limit=) |
+| =:name-in-headers=     | Used in the rate limit headers to identify a rate limit. (templates: =X-RateLimit-%s-Limit=, =X-RateLimit-%s-Limit=). Field names in HTTP headers are case-insensitive and are composed by any char except control chars  or separators |
 
 or 
 

@@ -12,7 +12,7 @@
   (st/merge
    {:nb-request-per-hour s/Int
     :rate-limit-key s/Str
-    :header-infix s/Str}
+    :name-in-headers s/Str}
    (st/optional-keys
     {:turnstile (s/protocol Turnstile)})))
 
@@ -41,15 +41,15 @@
   (fn [request]
     {:nb-request-per-hour n
      :rate-limit-key (:remote-addr request)
-     :header-infix "IP"}))
+     :name-in-headers "IP"}))
 
 (s/defn header-limit :- LimitFunction
-  ([n header header-infix]
+  ([n header name-in-headers]
    (fn [request]
      (when-let [header (get-in request [:headers header])]
        {:nb-request-per-hour n
         :rate-limit-key header
-        :header-infix header-infix}))))
+        :name-in-headers name-in-headers}))))
 
 (defn make-token []
   (str (java.util.UUID/randomUUID)))
@@ -90,11 +90,11 @@
      :body "{\"error\": \"Too Many Requests\"}"}))
 
 (s/defn rate-limit-headers
-  [{:keys [turnstile nb-request-per-hour header-infix]} :- Limit]
+  [{:keys [turnstile nb-request-per-hour name-in-headers]} :- Limit]
   (let [remaining (space turnstile nb-request-per-hour)]
-    (hash-map (format "X-RateLimit-%s-Limit" header-infix)
+    (hash-map (format "X-RateLimit-%s-Limit" name-in-headers)
               nb-request-per-hour
-              (format "X-RateLimit-%s-Remaining" header-infix)
+              (format "X-RateLimit-%s-Remaining" name-in-headers)
               remaining)))
 
 (s/defn compute-limits :- [Limit]
