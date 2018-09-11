@@ -1,4 +1,4 @@
-[[https://travis-ci.org/threatgrid/ring-turnstile-middleware][https://travis-ci.org/threatgrid/ring-turnstile-middleware.png?branch=master]]
+[[https://travis-ci.com/threatgrid/ring-turnstile-middleware][https://travis-ci.com/threatgrid/ring-turnstile-middleware.png?branch=master]]
 
 * ring-turnstile-middleware
 
