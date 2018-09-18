@@ -25,7 +25,7 @@
           :headers {"Content-Type" "application/json"
                     "Retry-After" 3}
           :body "{\"error\": \"Too Many Requests\"}"}
-         (sut/default-rate-limit-handler {} 2500))))
+         (sut/default-rate-limit-handler {} 3 {}))))
 
 (defn wrap-with-exception
   [f]
@@ -58,7 +58,7 @@
                   (sut/wrap-rate-limit {:redis-conf {}
                                         :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
-                                        (fn [request next-slot-in-ms]
+                                        (fn [request next-slot-in-ms _]
                                           {:status 429
                                            :headers {"Content-Type" "application/text"}
                                            :body "Too many requests, retry later"})}))]
