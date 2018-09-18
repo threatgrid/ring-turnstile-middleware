@@ -92,9 +92,9 @@
   [{:keys [turnstile nb-request-per-hour name-in-headers]} :- Limit]
   (let [remaining (space turnstile nb-request-per-hour)]
     (hash-map (format "X-RateLimit-%s-Limit" name-in-headers)
-              nb-request-per-hour
+              (str nb-request-per-hour)
               (format "X-RateLimit-%s-Remaining" name-in-headers)
-              remaining)))
+              (str remaining))))
 
 (s/defn compute-limits :- [Limit]
   [limit-fns :- [LimitFunction]

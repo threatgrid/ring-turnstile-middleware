@@ -42,8 +42,8 @@
                                         :limit-fns [(sut/ip-limit 5)]}))]
       (testing "Rate limit headers"
         (let [response (-> (request :get "/") app)]
-          (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
-          (is (= 5 (get-in response [:headers "X-RateLimit-IP-Limit"])))))
+          (is (= "4" (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= "5" (get-in response [:headers "X-RateLimit-IP-Limit"])))))
       (testing "Rate limit status and response"
         (dotimes [_ 5] (-> (request :get "/") app))
         (let [response (-> (request :get "/") app)]
@@ -78,30 +78,30 @@
                                                  ip-limit]}))]
       (testing "Limits when the `x-id` header is set"
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 9 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))
+          (is (= "9" (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "2")app)]
-          (is (= 9 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"])))
-          (is (= 6 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
-          (is (= 8 (get-in response [:headers "X-RateLimit-IP-Limit"])))))
+          (is (= "9" (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"])))
+          (is (= "6" (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= "8" (get-in response [:headers "X-RateLimit-IP-Limit"])))))
       (testing "Limits when the `x-id` header is not set"
         (let [response (-> (request :get "/") app)]
-          (is (= 5 (get-in response [:headers "X-RateLimit-IP-Remaining"])))
-          (is (= 8 (get-in response [:headers "X-RateLimit-IP-Limit"]))))
+          (is (= "5" (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= "8" (get-in response [:headers "X-RateLimit-IP-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 8 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))
+          (is (= "8" (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"]))))
         (let [response (-> (request :get "/") (header "x-id" "2") app)]
-          (is (= 8 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"])))))
+          (is (= "8" (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"])))))
       (testing "Unlimited limit for the exception limit"
         (let [response (-> (request :get "/") (header "x-id" "1234") app)]
           (is (not (contains? (:headers response) "X-RateLimit-ID-Remaining")))
           (is (not (contains? (:headers response) "X-RateLimit-IP-Remaining"))))
         (let [response (-> (request :get "/") (header "x-id" "1") app)]
-          (is (= 7 (get-in response [:headers "X-RateLimit-ID-Remaining"])))
-          (is (= 10 (get-in response [:headers "X-RateLimit-ID-Limit"]))))))))
+          (is (= "7" (get-in response [:headers "X-RateLimit-ID-Remaining"])))
+          (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"]))))))))
 
 (deftest wrap-rate-limit-key-prefix-test
   (let [app1 (-> (fn [req] {:status 200
@@ -117,6 +117,6 @@
                                        :key-prefix "api-2"
                                        :limit-fns [(sut/ip-limit 5)]}))]
     (let [response (-> (request :get "/") app1)]
-      (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"]))))
+      (is (= "4" (get-in response [:headers "X-RateLimit-IP-Remaining"]))))
     (let [response (-> (request :get "/") app2)]
-      (is (= 4 (get-in response [:headers "X-RateLimit-IP-Remaining"]))))))
+      (is (= "4" (get-in response [:headers "X-RateLimit-IP-Remaining"]))))))
