@@ -23,7 +23,7 @@
 (deftest default-rate-limit-handler-test
   (is (= {:status 429
           :headers {"Content-Type" "application/json"
-                    "Retry-After" 3}
+                    "Retry-After" "3"}
           :body "{\"error\": \"Too Many Requests\"}"}
          (sut/default-rate-limit-handler {} 3 {}))))
 
@@ -58,7 +58,7 @@
                   (sut/wrap-rate-limit {:redis-conf {}
                                         :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
-                                        (fn [request next-slot-in-ms _]
+                                        (fn [request next-slot-in-sec _]
                                           {:status 429
                                            :headers {"Content-Type" "application/text"}
                                            :body "Too many requests, retry later"})}))]

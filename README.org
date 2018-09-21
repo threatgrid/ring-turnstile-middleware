@@ -43,7 +43,7 @@ If you want to do some specific operations when a call is rate limited, you can 
                                :rate-limit-handler 
                                 (fn [request next-slot-in-sec limit]
                                  {:status 429
-                                  :body (format "Too many requests, try later in %d ms"
+                                  :body (format "Too many requests, try later in %d s"
                                                 next-slot-in-sec)})}))
 #+END_SRC
 
