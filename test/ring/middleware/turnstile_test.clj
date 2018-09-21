@@ -48,7 +48,7 @@
         (dotimes [_ 5] (-> (request :get "/") app))
         (let [response (-> (request :get "/") app)]
           (is (= 429 (:status response)))
-          (is (= 3600 (get-in response [:headers "Retry-After"])))
+          (is (= "3600" (get-in response [:headers "Retry-After"])))
           (is (= "{\"error\": \"Too Many Requests\"}"
                  (:body response)))))))
   (testing "Custom rate limit handler"

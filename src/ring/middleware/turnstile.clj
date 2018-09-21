@@ -85,7 +85,7 @@
   [request next-slot-in-sec limit]
   {:status 429
    :headers {"Content-Type" "application/json"
-             "Retry-After" next-slot-in-sec}
+             "Retry-After" (str next-slot-in-sec)}
    :body "{\"error\": \"Too Many Requests\"}"})
 
 (s/defn rate-limit-headers
