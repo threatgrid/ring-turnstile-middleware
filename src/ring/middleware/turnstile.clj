@@ -82,20 +82,19 @@
       int))
 
 (defn default-rate-limit-handler
-  [request next-slot-in-ms]
-  (let [retry-after (next-slot-in-sec next-slot-in-ms)]
-    {:status 429
-     :headers {"Content-Type" "application/json"
-               "Retry-After" retry-after}
-     :body "{\"error\": \"Too Many Requests\"}"}))
+  [request next-slot-in-sec limit]
+  {:status 429
+   :headers {"Content-Type" "application/json"
+             "Retry-After" (str next-slot-in-sec)}
+   :body "{\"error\": \"Too Many Requests\"}"})
 
 (s/defn rate-limit-headers
   [{:keys [turnstile nb-request-per-hour name-in-headers]} :- Limit]
   (let [remaining (space turnstile nb-request-per-hour)]
     (hash-map (format "X-RateLimit-%s-Limit" name-in-headers)
-              nb-request-per-hour
+              (str nb-request-per-hour)
               (format "X-RateLimit-%s-Remaining" name-in-headers)
-              remaining)))
+              (str remaining))))
 
 (s/defn compute-limits :- [Limit]
   [limit-fns :- [LimitFunction]
@@ -124,11 +123,11 @@
                                                     :key-prefix key-prefix})
           reached-limit (first-reached-limit limits)]
       (if reached-limit
-        (rate-limit-handler
-         request
-         (next-slot (:turnstile reached-limit)
-                    (:nb-request-per-hour reached-limit)
-                    (System/currentTimeMillis)))
+        (let [next-slot-sec (next-slot-in-sec
+                             (next-slot (:turnstile reached-limit)
+                                        (:nb-request-per-hour reached-limit)
+                                        (System/currentTimeMillis)))]
+          (rate-limit-handler request next-slot-sec reached-limit))
         (do (doseq [limit limits]
               (add-timed-item (:turnstile limit)
                               (java.util.UUID/randomUUID)

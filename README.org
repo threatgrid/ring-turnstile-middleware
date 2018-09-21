@@ -41,10 +41,10 @@ If you want to do some specific operations when a call is rate limited, you can 
                                :key-prefix "your-api"
                                :limit-fns [(ip-limit 200)]
                                :rate-limit-handler 
-                                (fn [request next-slot-in-ms]
+                                (fn [request next-slot-in-sec limit]
                                  {:status 429
-                                  :body (format "Too many requests, try later in %d ms"
-                                                next-slot-in-ms)})}))
+                                  :body (format "Too many requests, try later in %d s"
+                                                next-slot-in-sec)})}))
 #+END_SRC
 
 *** Custom limit
