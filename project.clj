@@ -1,4 +1,4 @@
-(defproject threatgrid/ring-turnstile-middleware "0.0.2-SNAPSHOT"
+(defproject threatgrid/ring-turnstile-middleware "0.0.2"
   :description "Ring middleware the Turnstile rate limiting service"
   :url "http://github.com/threatgrid/ring-turnstile-middleware"
   :license {:name "Eclipse Public License - v 1.0"
