@@ -28,8 +28,9 @@
     :db s/Int}))
 
 (s/defschema RedisConn
-  {:spec RedisSpec
-   :pool s/Any})
+  (st/optional-keys
+   {:spec RedisSpec
+    :pool s/Any}))
 
 (s/defschema Conf
   (st/merge
