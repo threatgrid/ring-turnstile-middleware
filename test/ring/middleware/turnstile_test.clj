@@ -38,7 +38,7 @@
     (let [app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conf {}
+                  (sut/wrap-rate-limit {:redis-conn {}
                                         :limit-fns [(sut/ip-limit 5)]}))]
       (testing "Rate limit headers"
         (let [response (-> (request :get "/") app)]
@@ -55,7 +55,7 @@
     (let [app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conf {}
+                  (sut/wrap-rate-limit {:redis-conn {}
                                         :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
                                         (fn [request next-slot-in-sec _]
@@ -73,7 +73,7 @@
           app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conf {}
+                  (sut/wrap-rate-limit {:redis-conn {}
                                         :limit-fns [header-limit
                                                  ip-limit]}))]
       (testing "Limits when the `x-id` header is set"
@@ -107,13 +107,13 @@
   (let [app1 (-> (fn [req] {:status 200
                            :headers {"Content-Type" "application/json"}
                            :body "{}"})
-                (sut/wrap-rate-limit {:redis-conf {}
+                (sut/wrap-rate-limit {:redis-conn {}
                                       :key-prefix "api-1"
                                       :limit-fns [(sut/ip-limit 5)]}))
         app2 (-> (fn [req] {:status 200
                             :headers {"Content-Type" "application/json"}
                             :body "{}"})
-                 (sut/wrap-rate-limit {:redis-conf {}
+                 (sut/wrap-rate-limit {:redis-conn {}
                                        :key-prefix "api-2"
                                        :limit-fns [(sut/ip-limit 5)]}))]
     (let [response (-> (request :get "/") app1)]

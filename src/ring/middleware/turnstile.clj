@@ -19,7 +19,7 @@
 (s/defschema LimitFunction
   (s/=> Limit HttpRequest))
 
-(s/defschema RedisConf
+(s/defschema RedisSpec
   (st/optional-keys
    {:host s/Str
     :port s/Int
@@ -27,9 +27,14 @@
     :password s/Str
     :db s/Int}))
 
+(s/defschema RedisConn
+  (st/optional-keys
+   {:spec RedisSpec
+    :pool s/Any}))
+
 (s/defschema Conf
   (st/merge
-   {:redis-conf RedisConf
+   {:redis-conn RedisConn
     :limit-fns [LimitFunction]}
    (st/optional-keys
     {:key-prefix s/Str
@@ -65,11 +70,11 @@
 
 (s/defn with-turnstile :- Limit
   [{:keys [rate-limit-key] :as limit} :- Limit
-   {:keys [redis-conf key-prefix] :as ctx}]
+   {:keys [redis-conn key-prefix] :as ctx}]
   (assoc limit
          :turnstile
-         (map->RedisTurnstile {:conn-spec redis-conf
-                               :pool {}
+         (map->RedisTurnstile {:conn-spec (:spec redis-conn)
+                               :pool (:pool redis-conn)
                                :name (cond->> rate-limit-key
                                        key-prefix (str key-prefix "-"))
                                :expiration-ms turnstile-expiration-ms})))
@@ -113,13 +118,13 @@
 (defn wrap-rate-limit
   "Middleware for the turnstile rate limiting service"
   [handler
-   {:keys [redis-conf limit-fns rate-limit-handler key-prefix]
+   {:keys [redis-conn limit-fns rate-limit-handler key-prefix]
     :or {rate-limit-handler default-rate-limit-handler
          key-prefix ""} :as conf}]
   ;; Check the configuration
   (s/validate Conf conf)
   (fn [request]
-    (let [limits (compute-limits limit-fns request {:redis-conf redis-conf
+    (let [limits (compute-limits limit-fns request {:redis-conn redis-conn
                                                     :key-prefix key-prefix})
           reached-limit (first-reached-limit limits)]
       (if reached-limit
