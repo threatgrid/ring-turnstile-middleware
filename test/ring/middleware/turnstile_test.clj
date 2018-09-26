@@ -5,9 +5,14 @@
             [schema.test :refer [validate-schemas]]
             [taoensso.carmine :as car]))
 
+(def redis-conn
+  {:spec {:host "localhost"
+          :port 6380}
+   :pool {}})
+
 (defn reset-limits!
   []
-  (car/wcar {} {}
+  (car/wcar redis-conn
             (car/flushdb)))
 
 (defn reset-limits-fixture
@@ -38,7 +43,7 @@
     (let [app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conn {}
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
                                         :limit-fns [(sut/ip-limit 5)]}))]
       (testing "Rate limit headers"
         (let [response (-> (request :get "/") app)]
@@ -55,7 +60,7 @@
     (let [app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conn {}
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
                                         :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
                                         (fn [request next-slot-in-sec _]
@@ -73,7 +78,7 @@
           app (-> (fn [req] {:status 200
                              :headers {"Content-Type" "application/json"}
                              :body "{}"})
-                  (sut/wrap-rate-limit {:redis-conn {}
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
                                         :limit-fns [header-limit
                                                  ip-limit]}))]
       (testing "Limits when the `x-id` header is set"
@@ -107,13 +112,13 @@
   (let [app1 (-> (fn [req] {:status 200
                            :headers {"Content-Type" "application/json"}
                            :body "{}"})
-                (sut/wrap-rate-limit {:redis-conn {}
+                (sut/wrap-rate-limit {:redis-conn redis-conn
                                       :key-prefix "api-1"
                                       :limit-fns [(sut/ip-limit 5)]}))
         app2 (-> (fn [req] {:status 200
                             :headers {"Content-Type" "application/json"}
                             :body "{}"})
-                 (sut/wrap-rate-limit {:redis-conn {}
+                 (sut/wrap-rate-limit {:redis-conn redis-conn
                                        :key-prefix "api-2"
                                        :limit-fns [(sut/ip-limit 5)]}))]
     (let [response (-> (request :get "/") app1)]

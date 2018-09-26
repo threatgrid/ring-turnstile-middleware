@@ -1,4 +1,3 @@
 language: clojure
 script: lein test
-services:
-  - redis-server
+before_script: sudo redis-server /etc/redis/redis.conf --port 6380
