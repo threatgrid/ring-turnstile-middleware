@@ -38,12 +38,16 @@
     (when-not (= "1234" (get-in request [:headers "x-id"]))
       (f request))))
 
+(def handler
+  (fn [req] {:status 200
+             :headers {"Content-Type" "application/json"}
+             :body "{}"}))
+
 (deftest wrap-rate-limit-test
   (testing "One limit"
-    (let [app (-> (fn [req] {:status 200
-                             :headers {"Content-Type" "application/json"}
-                             :body "{}"})
+    (let [app (-> handler
                   (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :remaining-header-enabled true
                                         :limit-fns [(sut/ip-limit 5)]}))]
       (testing "Rate limit headers"
         (let [response (-> (request :get "/") app)]
@@ -56,11 +60,26 @@
           (is (= "3600" (get-in response [:headers "Retry-After"])))
           (is (= "{\"error\": \"Too Many Requests\"}"
                  (:body response)))))))
-  (testing "Custom rate limit handler"
-    (let [app (-> (fn [req] {:status 200
-                             :headers {"Content-Type" "application/json"}
-                             :body "{}"})
+  (testing "Remaining header disabled"
+    (reset-limits!)
+    (let [app (-> handler
                   (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :limit-fns [(sut/ip-limit 5)]}))]
+      (testing "Rate limit headers"
+        (let [response (-> (request :get "/") app)]
+          (is (nil? (get-in response [:headers "X-RateLimit-IP-Remaining"])))
+          (is (= "5" (get-in response [:headers "X-RateLimit-IP-Limit"])))))
+      (testing "Rate limit status and response"
+        (dotimes [_ 5] (-> (request :get "/") app))
+        (let [response (-> (request :get "/") app)]
+          (is (= 429 (:status response)))
+          (is (= "3600" (get-in response [:headers "Retry-After"])))
+          (is (= "{\"error\": \"Too Many Requests\"}"
+                 (:body response)))))))
+  (testing "Custom rate limit handler"
+    (let [app (-> handler
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :remaining-header-enabled true
                                         :limit-fns [(sut/ip-limit 5)]
                                         :rate-limit-handler
                                         (fn [request next-slot-in-sec _]
@@ -75,10 +94,9 @@
     (reset-limits!)
     (let [ip-limit (wrap-with-exception (sut/ip-limit 8))
           header-limit (wrap-with-exception (sut/header-limit 10 "x-id" "ID"))
-          app (-> (fn [req] {:status 200
-                             :headers {"Content-Type" "application/json"}
-                             :body "{}"})
+          app (-> handler
                   (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :remaining-header-enabled true
                                         :limit-fns [header-limit
                                                  ip-limit]}))]
       (testing "Limits when the `x-id` header is set"
@@ -109,16 +127,14 @@
           (is (= "10" (get-in response [:headers "X-RateLimit-ID-Limit"]))))))))
 
 (deftest wrap-rate-limit-key-prefix-test
-  (let [app1 (-> (fn [req] {:status 200
-                           :headers {"Content-Type" "application/json"}
-                           :body "{}"})
-                (sut/wrap-rate-limit {:redis-conn redis-conn
-                                      :key-prefix "api-1"
-                                      :limit-fns [(sut/ip-limit 5)]}))
-        app2 (-> (fn [req] {:status 200
-                            :headers {"Content-Type" "application/json"}
-                            :body "{}"})
+  (let [app1 (-> handler
                  (sut/wrap-rate-limit {:redis-conn redis-conn
+                                       :remaining-header-enabled true
+                                       :key-prefix "api-1"
+                                       :limit-fns [(sut/ip-limit 5)]}))
+        app2 (-> handler
+                 (sut/wrap-rate-limit {:redis-conn redis-conn
+                                       :remaining-header-enabled true
                                        :key-prefix "api-2"
                                        :limit-fns [(sut/ip-limit 5)]}))]
     (let [response (-> (request :get "/") app1)]
