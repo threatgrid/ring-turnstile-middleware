@@ -38,6 +38,7 @@
     :limit-fns [LimitFunction]}
    (st/optional-keys
     {:key-prefix s/Str
+     :remaining-header-enabled s/Bool
      :rate-limit-handler (s/=> HttpResponse HttpRequest s/Int)})))
 
 ;;--- Limits
@@ -94,12 +95,16 @@
    :body "{\"error\": \"Too Many Requests\"}"})
 
 (s/defn rate-limit-headers
-  [{:keys [turnstile nb-request-per-hour name-in-headers]} :- Limit]
-  (let [remaining (space turnstile nb-request-per-hour)]
-    (hash-map (format "X-RateLimit-%s-Limit" name-in-headers)
-              (str nb-request-per-hour)
-              (format "X-RateLimit-%s-Remaining" name-in-headers)
-              (str remaining))))
+  [{:keys [turnstile nb-request-per-hour name-in-headers]} :- Limit
+   remaining-header-enabled :- s/Bool]
+  (merge (hash-map (format "X-RateLimit-%s-Limit" name-in-headers)
+                   (str nb-request-per-hour))
+         (when remaining-header-enabled
+           (let [remaining
+                 (do (expire-entries turnstile (System/currentTimeMillis))
+                     (space turnstile nb-request-per-hour))]
+             (hash-map (format "X-RateLimit-%s-Remaining" name-in-headers)
+                       (str remaining))))))
 
 (s/defn compute-limits :- [Limit]
   [limit-fns :- [LimitFunction]
@@ -118,9 +123,11 @@
 (defn wrap-rate-limit
   "Middleware for the turnstile rate limiting service"
   [handler
-   {:keys [redis-conn limit-fns rate-limit-handler key-prefix]
+   {:keys [redis-conn limit-fns rate-limit-handler key-prefix
+           remaining-header-enabled]
     :or {rate-limit-handler default-rate-limit-handler
-         key-prefix ""} :as conf}]
+         key-prefix ""
+         remaining-header-enabled false} :as conf}]
   ;; Check the configuration
   (s/validate Conf conf)
   (fn [request]
@@ -138,7 +145,7 @@
                               (java.util.UUID/randomUUID)
                               (System/currentTimeMillis)))
             (let [headers (->> limits
-                               (map rate-limit-headers)
+                               (map #(rate-limit-headers % remaining-header-enabled))
                                (apply merge))
                   response (handler request)]
               (update response :headers merge headers)))))))
