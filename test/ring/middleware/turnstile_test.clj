@@ -141,3 +141,38 @@
       (is (= "4" (get-in response [:headers "X-RateLimit-IP-Remaining"]))))
     (let [response (-> (request :get "/") app2)]
       (is (= "4" (get-in response [:headers "X-RateLimit-IP-Remaining"]))))))
+
+(def exception
+  (ex-info "Exception in another middleware"
+           {:origin :other-middleware}))
+
+(defn ex-mw
+  [handler]
+  (fn [request]
+    (throw exception)))
+
+(deftest error-handling-test
+  (testing "Exception from another mw"
+    (let [app (-> handler
+                  ex-mw
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :remaining-header-enabled true
+                                        :key-prefix "api-1"
+                                        :limit-fns [(sut/ip-limit 5)]}))]
+      (try
+        (-> (request :get "/") app)
+        (catch Exception e
+          (is (= exception e)
+              (str "Exceptions from other middlewares should not be flagged as "
+                   "coming from the ring-turnstile-middleware"))))))
+  (testing "Exception from the ring-turnstile-middleware"
+    (let [app (-> handler
+                  (sut/wrap-rate-limit {:redis-conn redis-conn
+                                        :remaining-header-enabled true
+                                        :limit-fns [(fn [request]
+                                                      (throw (Exception. "Error")))]}))]
+      (try
+        (-> (request :get "/") app)
+        (catch Exception e
+          (let [origin (-> (ex-data e) :origin)]
+            (is (= :ring-turnstile-middleware origin))))))))
