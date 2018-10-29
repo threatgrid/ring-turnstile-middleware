@@ -131,21 +131,35 @@
   ;; Check the configuration
   (s/validate Conf conf)
   (fn [request]
-    (let [limits (compute-limits limit-fns request {:redis-conn redis-conn
-                                                    :key-prefix key-prefix})
-          reached-limit (first-reached-limit limits)]
-      (if reached-limit
-        (let [next-slot-sec (next-slot-in-sec
-                             (next-slot (:turnstile reached-limit)
-                                        (:nb-request-per-hour reached-limit)
-                                        (System/currentTimeMillis)))]
-          (rate-limit-handler request next-slot-sec reached-limit))
-        (do (doseq [limit limits]
-              (add-timed-item (:turnstile limit)
-                              (java.util.UUID/randomUUID)
-                              (System/currentTimeMillis)))
-            (let [headers (->> limits
-                               (map #(rate-limit-headers % remaining-header-enabled))
-                               (apply merge))
-                  response (handler request)]
-              (update response :headers merge headers)))))))
+    (try
+      (let [limits (compute-limits limit-fns request {:redis-conn redis-conn
+                                                      :key-prefix key-prefix})
+            reached-limit (first-reached-limit limits)]
+        (if reached-limit
+          (let [next-slot-sec (next-slot-in-sec
+                               (next-slot (:turnstile reached-limit)
+                                          (:nb-request-per-hour reached-limit)
+                                          (System/currentTimeMillis)))]
+            (rate-limit-handler request next-slot-sec reached-limit))
+          (do (doseq [limit limits]
+                (add-timed-item (:turnstile limit)
+                                (java.util.UUID/randomUUID)
+                                (System/currentTimeMillis)))
+              (let [headers (->> limits
+                                 (map #(rate-limit-headers % remaining-header-enabled))
+                                 (apply merge))
+                    response (try
+                               (handler request)
+                               (catch Exception e
+                                 (throw (ex-info (.getMessage e)
+                                                 {:origin :other-handlers}
+                                                 e))))]
+                (update response :headers merge headers)))))
+      (catch Exception e
+        (let [origin (-> (ex-data e) :origin)]
+          (if (= origin :other-handlers)
+            (throw (.getCause e))
+            (throw (ex-info (.getMessage e)
+                            {:origin :ring-turnstile-middleware}
+                            e))))))))
+
