@@ -8,7 +8,7 @@
                         ["snapshots" {:url "https://clojars.org/repo" :creds :gpg}]]
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [org.clojure/tools.logging "0.4.1"]
-                 [threatgrid/turnstile "0.103"]
+                 [threatgrid/turnstile "0.104"]
                  [metosin/schema-tools "0.10.4"]
                  [prismatic/schema "1.1.9"]
                  [ring/ring-mock "0.3.2"]
