@@ -25,6 +25,8 @@
     :port s/Int
     :uri s/Str
     :password s/Str
+    :ssl-fn s/Any
+    :timeout-ms s/Int
     :db s/Int}))
 
 (s/defschema RedisConn
