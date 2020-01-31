@@ -4,6 +4,7 @@
   :license {:name "Eclipse Public License - v 1.0"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo}
+  :pedantic? :abort
   :deploy-repositories [["releases" {:url "https://clojars.org/repo" :creds :gpg}]
                         ["snapshots" {:url "https://clojars.org/repo" :creds :gpg}]]
   :dependencies [[org.clojure/clojure "1.10.1"]
@@ -13,4 +14,5 @@
                  [prismatic/schema "1.1.12"]
                  [ring/ring-mock "0.4.0"]
                  [ch.qos.logback/logback-classic "1.2.3"]]
+  :global-vars {*warn-on-reflection* true}
   :profile {:dev {:dependencies [[com.taoensso/carmine "2.18.1"]]}})
