@@ -4,6 +4,10 @@
 
 Ring middleware for the Turnstile rate limiting service
 
+** Changes
+
+- Note: Version [[https://clojars.org/threatgrid/ring-turnstile-middleware/versions/0.1.1][0.1.1]] is missing commit information--it corresponds to [[https://github.com/threatgrid/ring-turnstile-middleware/commit/6bef68919a0038d55721c44a84c03e7827a26f42][this commit]].
+
 ** Basic Usage
 
 Use =wrap-rate-limit= to create an instance of the middleware, wrap your handler with it:
