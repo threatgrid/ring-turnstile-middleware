@@ -34,5 +34,5 @@ jobs:
         uses: supercharge/redis-github-action@1.7.0
         with:
           redis-version: 7
-          redis-port: 12345
+          redis-port: 6380
       - run: lein test
